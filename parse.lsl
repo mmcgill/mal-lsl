@@ -44,7 +44,7 @@ string requote(string s) {
 // |[^\s\[\]{}('"`,;)]*)
 
 tokenize(string line) {
-    llOwnerSay("tokenize: " + line);
+//    llOwnerSay("tokenize: " + line);
     tokens = llParseString2List(line, [" ","\n","\t"], ["(",")","{","}","[","]","\"",";"]);
     // merge strings, drop comments
     integer pos = 0;
@@ -52,12 +52,12 @@ tokenize(string line) {
     integer escaped = 0;
     string token;
     do {
-        llOwnerSay("tokens: " + llDumpList2String(tokens,","));
+//        llOwnerSay("tokens: " + llDumpList2String(tokens,","));
         token = llList2String(tokens, pos);
         // stupid llParseString2List doesn't handle backslash spacers
         integer backslash_pos = llSubStringIndex(token, "\\");
         if ("\\" != token && backslash_pos >= 0) {
-            llOwnerSay("found backslash");
+//            llOwnerSay("found backslash");
             if (backslash_pos == llStringLength(token)-1) {
                 tokens = llListReplaceList(tokens, [llGetSubString(token,0,backslash_pos-1),"\\"],pos,pos);
             } else {
@@ -68,19 +68,19 @@ tokenize(string line) {
             }
             token = llList2String(tokens, pos);
         }
-        llOwnerSay("token: " + token);
+//        llOwnerSay("token: " + token);
         if (in_string == 1) {
             if (escaped == 1) {
                 tokens = llListReplaceList(tokens, [llList2String(tokens,pos-1)+token], pos-1,pos);
-                llOwnerSay("escaped="+token);
+//                llOwnerSay("escaped="+token);
                 escaped = 0;
             } else {
                 if ("\"" == token) {
                     in_string = 0;
-                    llOwnerSay("in_string=0");
+//                    llOwnerSay("in_string=0");
                     tokens = llListReplaceList(tokens, [requote(llList2String(tokens,pos-1))], pos-1, pos);
                 } else  if ("\\" == token) {
-                    llOwnerSay("escaped=1");
+//                    llOwnerSay("escaped=1");
                     escaped = 1;
                     //tokens = llListReplaceList(tokens, [], pos, pos);
                     tokens = llListReplaceList(tokens, [llList2String(tokens,pos-1)+token], pos-1,pos);
@@ -90,7 +90,7 @@ tokenize(string line) {
             }
         } else {
             if ("\"" == token) {
-                llOwnerSay("in_string=1");
+//                llOwnerSay("in_string=1");
                 in_string = 1;
                 tokens = llListReplaceList(tokens, [""], pos, pos);
                 pos = pos + 1;
@@ -103,7 +103,7 @@ tokenize(string line) {
     } while (pos < llGetListLength(tokens));
     num_tokens = llGetListLength(tokens);
     next_token = 0;
-    llOwnerSay("tokens: " + llDumpList2String(tokens,","));
+//    llOwnerSay("tokens: " + llDumpList2String(tokens,","));
 }
 
 string consume_token() {
@@ -129,7 +129,7 @@ reset_parse_error() {
 
 string read_atom() {
     string token = consume_token();
-    llOwnerSay("read_atom: "+token);
+//    llOwnerSay("read_atom: "+token);
     string type = llJsonValueType(token,[]);
     if ((JSON_NUMBER == type && "-" != token) || JSON_STRING == type || JSON_TRUE == type || JSON_FALSE == type ||
         JSON_NULL == type) {
@@ -158,15 +158,15 @@ string read_sequence() {
     string l = llList2Json(JSON_ARRAY, [type]);
     do {
         string token = peek_token();
-        llOwnerSay("read_sequence: "+token+","+l);
+//        llOwnerSay("read_sequence: "+token+","+l);
         if (stop_token == token) {
             consume_token();
-            llOwnerSay("read_sequence: returning "+l);
+//            llOwnerSay("read_sequence: returning "+l);
             return l;
         } else {
             string f = read_form();
             if (parse_error) return "";
-            llOwnerSay("read_sequence: appending "+f);
+//            llOwnerSay("read_sequence: appending "+f);
             l = llJsonSetValue(l, [JSON_APPEND], f);
         }
     } while (next_token < num_tokens);
@@ -175,7 +175,7 @@ string read_sequence() {
 
 string read_form() {
     string token = peek_token();
-    llOwnerSay("read_form: "+token);
+//    llOwnerSay("read_form: "+token);
     if ("(" == token || "[" == token) {
         return read_sequence();
     } else {
