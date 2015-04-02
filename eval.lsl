@@ -156,10 +156,12 @@ integer do_eval(string s) {
                         pop();
                         push(def(path, env_id));
                         return GO;
+                    } else if ("do" == symbol) {
+                        pop();
+                        push(_do(path,env_id));
+                        return GO;
                     }/* else if ("let*" == symbol) {
                         return let(form, env_id, specs);
-                    } else if ("do" == symbol) {
-                        return _do(form, env_id, specs);
                     } else if ("if" == symbol) {
                         return _if(form, env_id, specs);
                     } else if ("fn*" == symbol) {
@@ -424,6 +426,43 @@ integer do_def(string s) {
     return DONE;    
 }
 
+integer DO = 4;
+string _do(list path, string env_id) {
+    return json_obj(["s",    (string)DO,
+                     "n",    "children",
+                     "i",    2,
+                     "path", json_array(path),
+                     "env_id", env_id]);
+}
+
+integer do_do(string s) {
+    string n = llJsonGetValue(s,["n"]);
+    list path = llJson2List(llJsonGetValue(s,["path"]));
+    string env_id = llJsonGetValue(s,["env_id"]);
+    if (n == "children") {
+        integer i = (integer)llJsonGetValue(s,["i"]);
+        if (JSON_INVALID == llJsonValueType(form,path+i)) {
+            string result;
+            if (i == 2) {
+                result = JSON_NULL;
+            } else {
+                result = llJsonGetValue(form,path+(i-1));
+                if (JSON_STRING == llJsonValueType(form,path+(i-1)))
+                    result = requote(result);
+            }
+            form = llJsonSetValue(form,path,result);
+            pop();
+            return GO;
+        } else {
+            update(llJsonSetValue(s,["i"],(string)(i+1)));
+            push(eval(path+i,env_id));
+            return GO;
+        }
+    }
+    set_eval_error("Unrecognized do step: "+n);
+    return DONE;    
+}
+
 // run results
 integer WAIT = 0;
 integer DONE = 1;
@@ -442,8 +481,10 @@ integer run() {
             status = do_eval_ast(step);
         } else if (step_code == APPLY) {
             status = do_apply(step);
-        } else if (step_code = DEF) {
+        } else if (step_code == DEF) {
             status = do_def(step);
+        } else if (step_code == DO) {
+            status = do_do(step);
         } else {
             set_eval_error("invalid step code: "+(string)step_code);
             status = DONE;
