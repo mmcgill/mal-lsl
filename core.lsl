@@ -12,6 +12,9 @@ integer FN_SUB = 102;
 integer FN_MUL = 103;
 integer FN_DIV = 104;
 integer FN_PRSTR = 105;
+integer FN_LIST_QMARK = 106;
+integer FN_EMPTY_QMARK = 107;
+integer FN_COUNT = 108;
 
 string escape_str(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
@@ -164,12 +167,134 @@ string divide() {
     return (string)result;
 }
 
+string list_qmark() {
+    if (JSON_ARRAY == llJsonValueType(args_str, [0]) && LIST == (integer)llJsonGetValue(args_str, [0, 0])) {
+        return JSON_TRUE;
+    } else {
+        return JSON_FALSE;
+    }
+}
+
+string empty_qmark() {
+    integer tag = (integer)llJsonGetValue(args_str, [0, 0]);
+    if (JSON_ARRAY == llJsonValueType(args_str, [0]) && (LIST == tag || VECTOR == tag)) {
+        if (1 < llGetListLength(llJson2List(llList2String(args,0)))) {
+            return JSON_FALSE;
+        } else {
+            return JSON_TRUE;
+        }
+    } else {
+        return error("Invalid type");
+    }
+}
+
+string count() {
+    integer tag = (integer)llJsonGetValue(args_str, [0, 0]);
+    if (JSON_ARRAY == llJsonValueType(args_str, [0]) && (LIST == tag || VECTOR == tag)) {
+        return (string)(llGetListLength(llJson2List(llList2String(args,0)))-1);
+    } else {
+        return error("Invalid type");
+    }
+}
+/*
+string equal(list args) {
+    string x = llList2String(args,0);
+    string y = llList2String(args,1);
+    if (JSON_ARRAY == llJsonValueType(x, []) && JSON_ARRAY == llJsonValueType(y,[])) {
+        integer xtag = (integer)llJsonGetValue(x,[0]);
+        integer ytag = (integer)llJsonGetValue(y,[0]);
+        if ((xtag == LIST || xtag == VECTOR) && (ytag == LIST || ytag == VECTOR)) {
+            list xl = llJson2List(x);
+            list yl = llJson2List(y);
+            integer len = llGetListLength(xl);
+            if (len != llGetListLength(yl)) {
+                return JSON_FALSE;
+            }
+            integer i;
+            for (i=1; i<len; i++) {
+                if (JSON_TRUE != equal([llList2String(xl,i), llList2String(yl,i)]))
+                    return JSON_FALSE;
+            }
+            return JSON_TRUE;
+        } else if (xtag != ytag) {
+            return JSON_FALSE;
+        } else if (llJsonGetValue(x,[1]) == llJsonGetValue(y,[1])) {
+            return JSON_TRUE;
+        } else {
+            return JSON_FALSE;
+        }
+    } else {
+        if (x == y) return JSON_TRUE;
+        else return JSON_FALSE;
+    }
+}
+
+string less_than(list args) {
+    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
+    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
+        return set_eval_error("Invalid type");
+    }
+    float x = (float)llList2Float(args,0);
+    float y = (float)llList2Float(args,1);
+    if (x < y) return JSON_TRUE;
+    return JSON_FALSE;
+}
+
+string less_than_equal(list args) {
+    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
+    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
+        return set_eval_error("Invalid type");
+    }
+    float x = (float)llList2Float(args,0);
+    float y = (float)llList2Float(args,1);
+    if (x <= y) return JSON_TRUE;
+    return JSON_FALSE;
+}
+
+string greater_than(list args) {
+    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
+    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
+        return set_eval_error("Invalid type");
+    }
+    float x = (float)llList2Float(args,0);
+    float y = (float)llList2Float(args,1);
+    llOwnerSay("  "+(string)x+" > "+(string)y);
+    if (x > y) return JSON_TRUE;;
+    return JSON_FALSE;
+}
+
+string greater_than_equal(list args) {
+    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
+    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
+        return set_eval_error("Invalid type");
+    }
+    float x = (float)llList2Float(args,0);
+    float y = (float)llList2Float(args,1);
+    if (x >= y) return JSON_TRUE;
+    return JSON_FALSE;
+}
+
+string prn(list args) {
+    string s = "";
+    integer i;
+    for (i=0; i<llGetListLength(args); i++) {
+        if (i > 0) s += " ";
+        s += pr_str(llList2String(args,i));
+    }
+    llOwnerSay(s);
+    return JSON_NULL;
+}
+*/
+
 string run(integer id) {
     if (FN_PRSTR == id) return pr_str();
     if (FN_ADD == id)   return add();
     if (FN_SUB == id)   return subtract();
     if (FN_MUL == id)   return multiply();
     if (FN_DIV == id)   return divide();
+    if (FN_LIST_QMARK == id) return list_qmark();
+    if (FN_EMPTY_QMARK == id) return empty_qmark();
+    if (FN_COUNT == id) return count();
     return error("Unrecognized native fn id: "+(string)id);
 }
 

@@ -12,6 +12,9 @@ integer FN_SUB = 102;
 integer FN_MUL = 103;
 integer FN_DIV = 104;
 integer FN_PRSTR = 105;
+integer FN_LIST_QMARK = 106;
+integer FN_EMPTY_QMARK = 107;
+integer FN_COUNT = 108;
 
 string GLOBAL_ENV = "GLOBAL";
 
@@ -158,6 +161,9 @@ init_global_env() {
     add_native_fn(FN_SUB, "-", ["&", "y"]);
     add_native_fn(FN_MUL, "*", ["&", "y"]);
     add_native_fn(FN_DIV, "/", ["&", "y"]);
+    add_native_fn(FN_EMPTY_QMARK, "empty?", ["x"]);
+    add_native_fn(FN_LIST_QMARK, "list?", ["x"]);
+    add_native_fn(FN_COUNT, "count", ["x"]);
 }
 
 default
