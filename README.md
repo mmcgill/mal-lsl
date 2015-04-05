@@ -6,7 +6,7 @@ This is a MAL implementation in Second Life's Linded Scripting Language (LSL).
 
 ## Progress
 
-*MAL Steps completed*: 0-2
+*MAL Steps completed*: 0-3
 
 ## Usage
 
