@@ -15,6 +15,7 @@ integer FN_PRSTR = 105;
 integer FN_LIST_QMARK = 106;
 integer FN_EMPTY_QMARK = 107;
 integer FN_COUNT = 108;
+integer FN_LESS_THAN = 110;
 
 string escape_str(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
@@ -228,18 +229,18 @@ string equal(list args) {
         else return JSON_FALSE;
     }
 }
-
-string less_than(list args) {
+*/
+string less_than() {
     if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
     ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
-        return set_eval_error("Invalid type");
+        return error("Invalid type");
     }
     float x = (float)llList2Float(args,0);
     float y = (float)llList2Float(args,1);
     if (x < y) return JSON_TRUE;
     return JSON_FALSE;
 }
-
+/*
 string less_than_equal(list args) {
     if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
     ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
@@ -295,6 +296,7 @@ string run(integer id) {
     if (FN_LIST_QMARK == id) return list_qmark();
     if (FN_EMPTY_QMARK == id) return empty_qmark();
     if (FN_COUNT == id) return count();
+    if (FN_LESS_THAN == id) return less_than();
     return error("Unrecognized native fn id: "+(string)id);
 }
 

@@ -15,6 +15,7 @@ integer FN_PRSTR = 105;
 integer FN_LIST_QMARK = 106;
 integer FN_EMPTY_QMARK = 107;
 integer FN_COUNT = 108;
+integer FN_LESS_THAN = 110;
 
 string GLOBAL_ENV = "GLOBAL";
 
@@ -207,6 +208,7 @@ init_global_env() {
     add_native_fn(FN_EMPTY_QMARK, "empty?", ["x"]);
     add_native_fn(FN_LIST_QMARK, "list?", ["x"]);
     add_native_fn(FN_COUNT, "count", ["x"]);
+    add_native_fn(FN_LESS_THAN, "<", ["x", "y"]);
 }
 
 default
