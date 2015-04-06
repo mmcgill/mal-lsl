@@ -37,6 +37,13 @@ string requote(string s) {
     return "\""+s+"\"";
 }
 
+string read_form(list path) {
+    if (JSON_STRING == llJsonValueType(form,path))
+        return requote(llJsonGetValue(form,path));
+    else
+        return llJsonGetValue(form,path);
+}
+
 // We use an explicit stack so we can always pause computation to send a signal,
 // and then resume at the same place when the signal is received.
 // We must effectively write eval() as a state machine.
@@ -205,9 +212,11 @@ integer do_eval(string s) {
                         pop();
                         push(fn(path, env_id));
                         return GO;
-                    }/* else if ("if" == symbol) {
-                        return _if(form, env_id, specs);
-                    }*/
+                    } else if ("if" == symbol) {
+                        pop();
+                        push(_if(path, env_id));
+                        return GO;
+                    }
                 }
             }
         }
@@ -594,6 +603,47 @@ integer do_fn(string s) {
     return WAIT;
 }
 
+integer IF = 7;
+string _if(list path, string env_id) {
+    return json_obj(["s", IF,
+                     "n", "start",
+                     "path", json_array(path),
+                     "env_id", env_id]);
+}
+
+integer do_if(string s) {
+    string n = llJsonGetValue(s,["n"]);
+    list path = llJson2List(llJsonGetValue(s,["path"]));
+    string env_id = llJsonGetValue(s,["env_id"]);
+    if (n == "start") {
+        update(llJsonSetValue(s,["n"],"after_condition"));
+        push(eval(path+2, env_id));
+        return GO;
+    }
+    if (n == "after_condition") {
+        string cond = llJsonValueType(form,path+2);
+        if (JSON_FALSE == cond || JSON_NULL == cond) {
+            if (JSON_INVALID == llJsonValueType(form,path+4)) {
+                form = llJsonSetValue(form,path,JSON_NULL);
+                pop();
+                return GO;
+            } else {
+                form = llJsonSetValue(form,path,read_form(path+4));
+                pop();
+                push(eval(path,env_id));
+                return GO;
+            }
+        } else {
+            form = llJsonSetValue(form,path,read_form(path+3));
+            pop();
+            push(eval(path,env_id));
+            return GO;
+        }
+    }
+    set_eval_error("Unrecognized if step: "+n);
+    return DONE;    
+}
+
 // run results
 integer WAIT = 0;
 integer DONE = 1;
@@ -621,6 +671,8 @@ integer run() {
             status = do_let(step);
         } else if (step_code == FN) {
             status = do_fn(step);
+        } else if (step_code == IF) {
+            status = do_if(step);
         } else {
             set_eval_error("invalid step code: "+(string)step_code);
             status = DONE;
