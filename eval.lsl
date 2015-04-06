@@ -175,6 +175,18 @@ string json_array(list l) {
     return llList2Json(JSON_ARRAY, l);
 }
 
+integer decref_if_needed(list path) {
+    llOwnerSay("eval: decref_if_needed: path=["+llDumpList2String(path, ",")+"]");
+    // If the result was a function, then it has a ref on its closed-over environment,
+    // and that ref isn't going to be released by function application, so we release it
+    // to avoid leaking the closed over environment.
+    if (JSON_OBJECT == llJsonValueType(form,path)) {
+        send_env_decref_req("done", llJsonGetValue(form,path+["env_id"]));
+        return WAIT;
+    }
+    return GO;
+}
+
 integer EVAL = 0;
 
 string eval(list path,string env_id) {
@@ -284,9 +296,17 @@ integer do_eval_ast(string s) {
         if (success == JSON_TRUE) {
             if (JSON_STRING == llJsonValueType(msg,["data"]))
                 data = requote(data);
+            llOwnerSay("eval: eval_ast: after_symbol_lookup: data="+data);
             form = llJsonSetValue(form, path, data);
             pop();
-            return GO;
+            // if we just copied a closure, we need to up the refcount to the referenced environment
+            if (JSON_OBJECT == llJsonValueType(data,[]) && JSON_INVALID == llJsonValueType(data,["id"])) {
+                string id = llJsonGetValue(data,["env_id"]);
+                send_env_incref_req("eval_ast",id);
+                return WAIT;
+            } else {
+                return GO;
+            }
         } else {
             set_eval_error("Undefined symbol "+llJsonGetValue(form, path+1));
             return DONE;
@@ -318,7 +338,7 @@ list validate_args(list binds,list path) {
     list args = llDeleteSubList(llJson2List(llJsonGetValue(form,path)),0,1);
     integer num_args = llGetListLength(args);
     integer num_binds = llGetListLength(binds);
-    llOwnerSay("apply:num_args="+(string)num_args+" num_binds="+(string)num_binds);
+//    llOwnerSay("apply:num_args="+(string)num_args+" num_binds="+(string)num_binds);
     if (num_args != num_binds) {
         set_eval_error("Wrong number of args ("+(string)num_args+")");
         return [];
@@ -350,7 +370,7 @@ integer do_apply(string s) {
         integer is_native = (JSON_INVALID != llJsonValueType(form,path+[1,"id"]));
         list args = validate_args(binds,path);
         if (eval_error) return DONE;
-        llOwnerSay("eval: apply args="+llList2Json(JSON_ARRAY,args));
+//        llOwnerSay("eval: apply args="+llList2Json(JSON_ARRAY,args));
         if (is_native) {
             integer native_id = (integer)llJsonGetValue(form,path+[1, "id"]);
             update(llJsonSetValue(s,["n"],"after_native"));
@@ -377,7 +397,7 @@ integer do_apply(string s) {
         }
         if (JSON_STRING == llJsonValueType(msg,["data"]))
             result=requote(result);
-        llOwnerSay("eval: apply result: "+result);
+//        llOwnerSay("eval: apply result: "+result);
         form=llJsonSetValue(form,path,result);
         if (JSON_STRING == llJsonValueType(msg,["data"]) && path==[]) {
             form = requote(form);
@@ -475,6 +495,7 @@ integer do_do(string s) {
     string n = llJsonGetValue(s,["n"]);
     list path = llJson2List(llJsonGetValue(s,["path"]));
     string env_id = llJsonGetValue(s,["env_id"]);
+    integer i = (integer)llJsonGetValue(s,["i"]);
     if (n == "children") {
         integer i = (integer)llJsonGetValue(s,["i"]);
         if (JSON_INVALID == llJsonValueType(form,path+i)) {
@@ -490,10 +511,21 @@ integer do_do(string s) {
             pop();
             return GO;
         } else {
-            update(llJsonSetValue(s,["i"],(string)(i+1)));
-            push(eval(path+i,env_id));
-            return GO;
+            if (i == 2) {
+                update(llJsonSetValue(s,["i"],(string)(i+1)));
+                push(eval(path+i,env_id));
+                return GO;
+            } else {
+                update(llJsonSetValue(s,["n"], "after_decref"));
+                return decref_if_needed(path+(i-1));
+            }
         }
+    }
+    if (n == "after_decref") {
+        s=llJsonSetValue(s,["i"],(string)(i+1));
+        update(llJsonSetValue(s,["n"],"children"));
+        push(eval(path+i,env_id));
+        return GO;
     }
     set_eval_error("Unrecognized do step: "+n);
     return DONE;    
@@ -529,7 +561,7 @@ integer do_let(string s) {
         return WAIT;
     }        
     if (n == "after_create") {
-        llOwnerSay("eval: let: environment created");
+//        llOwnerSay("eval: let: environment created");
         new_env_id = llJsonGetValue(msg, ["data"]);
         s = llJsonSetValue(s, ["new_env_id"], new_env_id);
         i = 1;
@@ -537,11 +569,22 @@ integer do_let(string s) {
         n = "after_set";  
     }
     if (n == "after_eval") {
-        string sym = llJsonGetValue(form,path+[2,i,1]);
         string result =  llJsonGetValue(form,path+[2,i+1]);
         if (JSON_STRING == llJsonValueType(form,path+[2,i+1]))
             result = requote(result);
-        llOwnerSay("eval: let: arg evaluated ("+sym+"="+result+")");
+//        llOwnerSay("eval: let: arg evaluated ("+sym+"="+result+")");
+        if (JSON_OBJECT == llJsonValueType(result,[]) && JSON_INVALID == llJsonValueType(result,["id"])) {
+            // we've 'consumed' a closure, so we need to decref
+            send_env_decref_req("after_decref", llJsonGetValue(result,["env_id"]));
+            update(llJsonSetValue(s,["n"],"after_decref"));
+            return WAIT;
+        } else {
+            n="after_decref";
+        }
+    }
+    if (n == "after_decref") {
+        string sym = llJsonGetValue(form,path+[2,i,1]);
+        string result =  llJsonGetValue(form,path+[2,i+1]);
         s=llJsonSetValue(s,["n"],"after_set");
         s=llJsonSetValue(s,["i"],(string)(i+2));
         update(s);
@@ -549,7 +592,7 @@ integer do_let(string s) {
         return WAIT;
     }
     if (n == "after_set") {
-        llOwnerSay("eval: let: arg set");
+//        llOwnerSay("eval: let: arg set");
         if (JSON_INVALID == llJsonValueType(form,path+[2,i])) {
             update(llJsonSetValue(s,["n"],"delete_env"));
             string expr = llJsonGetValue(form,path+3);
@@ -565,7 +608,7 @@ integer do_let(string s) {
         return GO;
     }
     if (n == "delete_env") {
-        llOwnerSay("eval: let: delete env");
+//        llOwnerSay("eval: let: delete env");
         pop();
         send_env_decref_req("delete_env", new_env_id);
         return WAIT;
@@ -657,35 +700,22 @@ integer run() {
         llOwnerSay("step: "+step+" ("+(string)llGetFreeMemory()+")");
         llOwnerSay("form: "+form);
         //dump_stack();
-        if (step_code == EVAL) {
-            status = do_eval(step);
-        } else if (step_code == EVAL_AST) {
-            status = do_eval_ast(step);
-        } else if (step_code == APPLY) {
-            status = do_apply(step);
-        } else if (step_code == DEF) {
-            status = do_def(step);
-        } else if (step_code == DO) {
-            status = do_do(step);
-        } else if (step_code == LET) {
-            status = do_let(step);
-        } else if (step_code == FN) {
-            status = do_fn(step);
-        } else if (step_code == IF) {
-            status = do_if(step);
-        } else {
+        if (step_code == EVAL) status = do_eval(step);
+        else if (step_code == EVAL_AST) status = do_eval_ast(step);
+        else if (step_code == APPLY)    status = do_apply(step);
+        else if (step_code == DEF)      status = do_def(step);
+        else if (step_code == DO)       status = do_do(step);
+        else if (step_code == LET)      status = do_let(step);
+        else if (step_code == FN)       status = do_fn(step);
+        else if (step_code == IF)       status = do_if(step);
+        else {
             set_eval_error("invalid step code: "+(string)step_code);
             status = DONE;
         }
         //dump_stack();
     }
     if (is_empty()) {
-        // If the result was a function, then it has a ref on its closed-over environment,
-        // and that ref isn't going to be released by function application, so we release it
-        // to avoid leaking the closed over environment.
-        if (JSON_OBJECT == llJsonValueType(form,[])) {
-            send_env_decref_req("done", llJsonGetValue(form,["env_id"]));
-        }
+        decref_if_needed([]);
         return DONE;
     } else {
         return status;

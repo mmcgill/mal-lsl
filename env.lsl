@@ -97,6 +97,7 @@ send_env_decref_resp(string tag) {
 string env_map = "{}";
 string env_outer_map = "{}";
 string env_refcounts = "{}";
+string env_decrefs = "{}";
 integer next_env_id = 0;
 
 string create(string outer_id, string binds, string args) {
@@ -107,14 +108,15 @@ string create(string outer_id, string binds, string args) {
         env_outer_map = llJsonSetValue(env_outer_map, [env_id], outer_id);
     }
     env_refcounts = llJsonSetValue(env_refcounts, [env_id], "1");
-    llOwnerSay("env: create: binds="+binds+" args="+args);
+    env_decrefs = llJsonSetValue(env_decrefs, [env_id], "[]");
+    llOwnerSay("env: create: env_id="+env_id+"binds="+binds+" args="+args);
     integer i = 0;
     while (JSON_INVALID != llJsonValueType(args,[i])) {
         string k = llJsonGetValue(binds,[i,1]);
         string v = llJsonGetValue(args,[i]);
         if (JSON_STRING == llJsonValueType(args,[i]))
             v = requote(v);
-        llOwnerSay("env: create: "+k+"="+v);
+//        llOwnerSay("env: create: "+k+"="+v);
         set(env_id,k,v);
         i++;
     }
@@ -127,10 +129,16 @@ delete(string env_id) {
         return;
     }
     llOwnerSay("env: deleting "+env_id);
+    integer i;
+    list decrefs = llJson2List(llJsonGetValue(env_decrefs,[env_id]));
+    for (i=0; i<llGetListLength(decrefs); i++) {
+        dec_refcount(llList2String(decrefs,i));
+    }
     
     env_map = llJsonSetValue(env_map, [env_id], JSON_DELETE);
     env_outer_map = llJsonSetValue(env_outer_map, [env_id], JSON_DELETE);
     env_refcounts = llJsonSetValue(env_refcounts, [env_id], JSON_DELETE);
+    env_decrefs = llJsonSetValue(env_decrefs, [env_id], JSON_DELETE);
 }
 
 // return the id of the outer environment
@@ -167,7 +175,25 @@ string get(string env_id, string k) {
 }
 
 set(string env_id, string k, string v) {
+    // if we're overwriting an old value, we may need to decref
+    // to avoid a leak
+    if (JSON_OBJECT == llJsonValueType(env_map, [env_id, k]) && JSON_INVALID == llJsonValueType(env_map,[env_id,k,"id"])) {
+        string id = llJsonGetValue(env_map,[env_id,k,"env_id"]);
+        if (id != env_id) {
+            dec_refcount(id);
+            list decrefs = llJson2List(llJsonGetValue(env_decrefs, [env_id]));
+            integer i = llListFindList(decrefs,[id]);
+            env_decrefs = llJsonSetValue(env_decrefs, [env_id,i], JSON_DELETE);
+        }
+    }
     env_map = llJsonSetValue(env_map, [env_id, k], v);
+    if (JSON_OBJECT == llJsonValueType(v,[]) && JSON_INVALID == llJsonValueType(v,["id"])) {
+        string id = llJsonGetValue(v,["env_id"]);
+        if (id != env_id) {
+            inc_refcount(id);
+            env_decrefs = llJsonSetValue(env_decrefs, [env_id, JSON_APPEND], id);
+        }
+    }
 }
 
 inc_refcount(string env_id) {
@@ -217,7 +243,7 @@ default
     {
         if (me == NULL_KEY) me = llGenerateKey();
         init_global_env();
-        llOwnerSay("env: ready");
+        llOwnerSay("env: ready ("+(string)llGetFreeMemory());
     }
     
     touch_start(integer num)
@@ -251,7 +277,7 @@ default
             string env_id = create(outer_id,llJsonGetValue(str,["binds"]),llJsonGetValue(str,["args"]));
             send_env_create_resp(tag, env_id);
         } else if (num == MSG_ENV_SET_REQ) {
-            llOwnerSay("env: set: msg="+str);
+//            llOwnerSay("env: set: msg="+str);
             string tag = llJsonGetValue(str,["tag"]);
             string env_id = llJsonGetValue(str,["env_id"]);
             string symbol = llJsonGetValue(str,["symbol"]);
@@ -259,8 +285,8 @@ default
             if (JSON_STRING == llJsonValueType(str,["data"]))
                 v = requote(v);
             set(env_id, symbol, v);
-            llOwnerSay("env: set k="+symbol+" v="+v);
-            llOwnerSay("env: "+env_map);
+//            llOwnerSay("env: set k="+symbol+" v="+v);
+//            llOwnerSay("env: "+env_map);
             send_env_set_resp(tag);
         } else if (num == MSG_ENV_INCREF_REQ) {
             string tag = llJsonGetValue(str,["tag"]);
