@@ -15,7 +15,12 @@ integer FN_PRSTR = 105;
 integer FN_LIST_QMARK = 106;
 integer FN_EMPTY_QMARK = 107;
 integer FN_COUNT = 108;
+integer FN_EQ = 109;
 integer FN_LESS_THAN = 110;
+integer FN_LESS_THAN_EQ = 111;
+integer FN_GREATER_THAN = 112;
+integer FN_GREATER_THAN_EQ = 113;
+integer FN_PRN = 114;
 
 string escape_str(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
@@ -32,6 +37,13 @@ string escape_str(string s) {
 
 string requote(string s) {
     return "\""+escape_str(s)+"\"";
+}
+
+string read_form(string s, list path) {
+    if (JSON_STRING == llJsonValueType(s,path))
+        return requote(llJsonGetValue(s,path));
+    else
+        return llJsonGetValue(s,path);
 }
 
 //////////// MESSAGES ///////////////////
@@ -82,8 +94,6 @@ string _pr_str(list path) {
     } else if (JSON_NULL == type) {
         return "null";
     } else if (JSON_STRING == type) {
-        // TODO: escape double quotes and backslashes
-//        return "\\\"" + llJsonGetValue(form, path) + "\\\"";
         return escape_str(requote(llJsonGetValue(form, path)));
     } else if (JSON_ARRAY == type) {
         integer t = (integer)llJsonGetValue(form, path+0);
@@ -118,7 +128,7 @@ string pr_str() {
     form = llJsonGetValue(args_str, [0]);
     if (JSON_STRING == llJsonValueType(args_str,[0]))
         form = requote(form);
-    llOwnerSay("core: pr_str("+form+")");
+//    llOwnerSay("core: pr_str("+form+")");
     args = [];
     args_str = "";
     pr_str_error = 0;
@@ -127,7 +137,7 @@ string pr_str() {
     if (pr_str_error) {
         return error(pr_str_error_message);
     } else {
-        llOwnerSay("core: pr_str="+result);
+//        llOwnerSay("core: pr_str="+result);
         return result;
     }
 }
@@ -197,10 +207,10 @@ string count() {
         return error("Invalid type");
     }
 }
-/*
-string equal(list args) {
-    string x = llList2String(args,0);
-    string y = llList2String(args,1);
+
+string equal(list path_a, list path_b) {
+    string x = read_form(args_str, path_a);
+    string y = read_form(args_str, path_b);
     if (JSON_ARRAY == llJsonValueType(x, []) && JSON_ARRAY == llJsonValueType(y,[])) {
         integer xtag = (integer)llJsonGetValue(x,[0]);
         integer ytag = (integer)llJsonGetValue(y,[0]);
@@ -213,7 +223,7 @@ string equal(list args) {
             }
             integer i;
             for (i=1; i<len; i++) {
-                if (JSON_TRUE != equal([llList2String(xl,i), llList2String(yl,i)]))
+                if (JSON_TRUE != equal(path_a+[i], path_b+[i]))
                     return JSON_FALSE;
             }
             return JSON_TRUE;
@@ -229,63 +239,37 @@ string equal(list args) {
         else return JSON_FALSE;
     }
 }
-*/
-string less_than() {
+
+string compare(integer code) {
     if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
     ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
         return error("Invalid type");
     }
     float x = (float)llList2Float(args,0);
     float y = (float)llList2Float(args,1);
-    if (x < y) return JSON_TRUE;
-    return JSON_FALSE;
-}
-/*
-string less_than_equal(list args) {
-    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
-    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
-        return set_eval_error("Invalid type");
-    }
-    float x = (float)llList2Float(args,0);
-    float y = (float)llList2Float(args,1);
-    if (x <= y) return JSON_TRUE;
-    return JSON_FALSE;
+    integer result;
+    if (code == FN_LESS_THAN) result = (x < y);
+    else if (code == FN_LESS_THAN_EQ) result = (x <= y);
+    else if (code == FN_GREATER_THAN) result = (x > y);
+    else if (code == FN_GREATER_THAN_EQ) result = (x >= y);
+
+    if (result) return JSON_TRUE;
+    else return JSON_FALSE;
 }
 
-string greater_than(list args) {
-    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
-    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
-        return set_eval_error("Invalid type");
-    }
-    float x = (float)llList2Float(args,0);
-    float y = (float)llList2Float(args,1);
-    llOwnerSay("  "+(string)x+" > "+(string)y);
-    if (x > y) return JSON_TRUE;;
-    return JSON_FALSE;
-}
-
-string greater_than_equal(list args) {
-    if (JSON_NUMBER != llJsonValueType(llList2String(args,0), [])
-    ||  JSON_NUMBER != llJsonValueType(llList2String(args,1), [])) {
-        return set_eval_error("Invalid type");
-    }
-    float x = (float)llList2Float(args,0);
-    float y = (float)llList2Float(args,1);
-    if (x >= y) return JSON_TRUE;
-    return JSON_FALSE;
-}
-
-string prn(list args) {
+string prn() {
     string s = "";
     integer i;
+    form = args_str;
     for (i=0; i<llGetListLength(args); i++) {
         if (i > 0) s += " ";
-        s += pr_str(llList2String(args,i));
+        s += _pr_str([i]);
     }
+    // use llJsonGetValue to 'unquote' one level
+    s = llJsonGetValue("\""+s+"\"",[]);
     llOwnerSay(s);
     return JSON_NULL;
 }
-*/
 
 string run(integer id) {
     if (FN_PRSTR == id) return pr_str();
@@ -296,7 +280,9 @@ string run(integer id) {
     if (FN_LIST_QMARK == id) return list_qmark();
     if (FN_EMPTY_QMARK == id) return empty_qmark();
     if (FN_COUNT == id) return count();
-    if (FN_LESS_THAN == id) return less_than();
+    if (FN_EQ == id) return equal([0],[1]);
+    if (FN_LESS_THAN <= id && id <= FN_GREATER_THAN_EQ) return compare(id);
+    if (FN_PRN == id) return prn();
     return error("Unrecognized native fn id: "+(string)id);
 }
 
@@ -326,7 +312,7 @@ default
             integer id = (integer)llJsonGetValue(str,["native_id"]);
             args_str = llJsonGetValue(str,["args"]);
             args = llJson2List(args_str);
-            llOwnerSay("core: args="+args_str);
+//            llOwnerSay("core: args="+args_str);
             string data = run(id);
             if (JSON_INVALID == data) {
                 send_native_resp(tag, JSON_FALSE, core_error_message);
@@ -334,7 +320,7 @@ default
                 send_native_resp(tag, JSON_TRUE, data);
             }
             free();
-            llOwnerSay("core: ready ("+(string)llGetFreeMemory()+")");
+//            llOwnerSay("core: ready ("+(string)llGetFreeMemory()+")");
         }
     }
 }

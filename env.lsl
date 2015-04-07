@@ -15,7 +15,12 @@ integer FN_PRSTR = 105;
 integer FN_LIST_QMARK = 106;
 integer FN_EMPTY_QMARK = 107;
 integer FN_COUNT = 108;
+integer FN_EQ = 109;
 integer FN_LESS_THAN = 110;
+integer FN_LESS_THAN_EQ = 111;
+integer FN_GREATER_THAN = 112;
+integer FN_GREATER_THAN_EQ = 113;
+integer FN_PRN = 114;
 
 string GLOBAL_ENV = "GLOBAL";
 
@@ -234,7 +239,12 @@ init_global_env() {
     add_native_fn(FN_EMPTY_QMARK, "empty?", ["x"]);
     add_native_fn(FN_LIST_QMARK, "list?", ["x"]);
     add_native_fn(FN_COUNT, "count", ["x"]);
+    add_native_fn(FN_EQ,"=",["x","y"]);
     add_native_fn(FN_LESS_THAN, "<", ["x", "y"]);
+    add_native_fn(FN_LESS_THAN_EQ,"<=", ["x","y"]);
+    add_native_fn(FN_GREATER_THAN,">", ["x","y"]);
+    add_native_fn(FN_GREATER_THAN_EQ,">=", ["x","y"]);
+    add_native_fn(FN_PRN,"prn", ["&", "x"]);
 }
 
 default
