@@ -330,6 +330,7 @@ integer APPLY = 2;
 string apply(list path) {
     return json_obj(["s",    (string)APPLY,
                      "n",    "start",
+                     "i",    2,
                      "path", json_array(path)]);
 }
 
@@ -373,16 +374,42 @@ integer do_apply(string s) {
 //        llOwnerSay("eval: apply args="+llList2Json(JSON_ARRAY,args));
         if (is_native) {
             integer native_id = (integer)llJsonGetValue(form,path+[1, "id"]);
-            update(llJsonSetValue(s,["n"],"after_native"));
-            send_native_req("after_native", native_id, args);
+            s=llJsonSetValue(s,["mode"],"native");
+            update(llJsonSetValue(s,["n"],"consume_args"));
+            send_native_req("consume_args", native_id, args);
             return WAIT;
         } else {
             string closure_env_id = llJsonGetValue(form,path+[1,"env_id"]);
-            s=llJsonSetValue(s,["n"],"after_env_create");
+            s=llJsonSetValue(s,["n"],"consume_args");
             s=llJsonSetValue(s,["closure_env_id"],closure_env_id);
+            s=llJsonSetValue(s,["mode"],"closure");
             update(s);
-            send_env_create_req("after_env_create", closure_env_id, binds, args);
+            send_env_create_req("consume_args", closure_env_id, binds, args);
             return WAIT;
+        }
+    }
+    if (n == "consume_args") {
+        // we're 'consuming' each argument, so any arguments that are functions need to have their
+        // closed-over environments decref'd
+        integer i = (integer)llJsonGetValue(s,["i"]);
+        if (i==2) {
+            string new_env_id = llJsonGetValue(msg,["data"]);
+            s=llJsonSetValue(s,["new_env_id"],new_env_id);
+        }
+        if (JSON_INVALID == llJsonValueType(form,path+i)) {
+            if ("closure"==llJsonGetValue(s,["mode"])) {
+                update(llJsonSetValue(s,["n"],"after_env_create"));
+            } else {
+                update(llJsonSetValue(s,["n"],"after_native"));
+            }
+            return GO;
+        } else {
+            update(llJsonSetValue(s,["i"],(string)(i+1)));
+            if (JSON_OBJECT == llJsonValueType(form,path+i) && JSON_INVALID == llJsonValueType(form,path+[i,"id"])) {
+                send_env_decref_req("consume_args", llJsonGetValue(form,path+[i,"env_id"]));
+                return WAIT;
+            }
+            return GO;
         }
     }
     if (n == "after_native") {
@@ -410,11 +437,11 @@ integer do_apply(string s) {
         string body = llJsonGetValue(form,path+[1,"body"]);
         if (JSON_STRING == llJsonValueType(form,path+[1,"body"]))
             body = requote(body);
-        string new_env_id = llJsonGetValue(msg,["data"]);
         s=llJsonSetValue(s,["n"],"after_eval");
-        s=llJsonSetValue(s,["new_env_id"],new_env_id);
         update(s);
-        form=llJsonSetValue(form,path,body);
+        if (path == []) form = body;
+        else form=llJsonSetValue(form,path,body);
+        string new_env_id = llJsonGetValue(s,["new_env_id"]);
         push(eval(path,new_env_id));
         return GO;
     }
