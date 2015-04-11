@@ -6,7 +6,9 @@
  */
 
 key me = NULL_KEY;
-integer read_chan = -34;
+integer read_chan = 0;
+integer write_chan = 0;
+key listen_key = NULL_KEY;
 
 integer FN_PRSTR = 105;
 
@@ -68,43 +70,69 @@ integer succeeded(string msg) {
     return JSON_TRUE == llJsonValueType(msg, ["success?"]);
 }
 
-READ() {
-    llOwnerSay("repl: loop");
-    llListen(read_chan, "", llGetOwner(), "");
-    llTextBox(llGetOwner(), "user> ", read_chan);
-}
+string input;
 
 default
 {
     state_entry()
     {
         if (me == NULL_KEY) me = llGenerateKey();
-        llOwnerSay("repl: waiting");
-    }
-
-    touch_start(integer total_number)
-    {
-        // only owner can trigger the REPL
-        if (llGetOwner() != llDetectedKey(0)) return;
-        state loop;
+        llOwnerSay("repl: ready ("+(string)llGetFreeMemory()+")");
+        state read;
     }
 }
 
-state loop
+state read
 {
     state_entry()
     {
-        READ();
+        llOwnerSay("repl: read");
+        llListen(read_chan, "", llGetOwner(), "");
+        if (listen_key != NULL_KEY) {
+            llListen(read_chan, "", listen_key, "");
+        }
+    }
+    
+    on_rez(integer param)
+    {
+        llOwnerSay("Rezzed, responding on "+(string)param);
+        read_chan = param;
+        write_chan = param;
+        llListen(param,"MAL HTTP Bridge",NULL_KEY,"ack");
+        llSay(param,"ready");
+    }
+
+    listen(integer chan, string name, key id, string message)
+    {
+        llOwnerSay("repl: chan="+(string)chan+" name="+name+" key="+(string)id+" msg="+message);
+        if (chan == read_chan) {
+            if ("," == llGetSubString(message, 0, 0)) {
+                input = llGetSubString(message,1,-1);
+                if (input=="exit") {
+                    llOwnerSay("Goodbye.");
+                    llDie();
+                }
+                state eval;
+            }
+        }
+        if (name == "MAL HTTP Bridge") {
+            listen_key = id;
+            llOwnerSay("Accepting commands from "+(string)id);
+            state default;
+        }
+    }    
+}
+
+state eval
+{
+    state_entry()
+    {
+        llMessageLinked(LINK_THIS, MSG_PARSE_REQ, input, me);
     }
     
     touch(integer num)
     {
-        READ();
-    }
-    
-    listen(integer chan, string name, key id, string message)
-    {
-        llMessageLinked(LINK_THIS, MSG_PARSE_REQ, message, me);
+        state read;
     }
     
     link_message(integer sender, integer num, string str, key id)
@@ -117,10 +145,11 @@ state loop
                 if (JSON_STRING == llJsonValueType(str,["data"]))
                     data = requote(data);
                 string req = eval_req("eval1", data);
-                llOwnerSay("repl: eval_req: "+req);
+                //llOwnerSay("repl: eval_req: "+req);
                 llMessageLinked(LINK_THIS, MSG_EVAL_REQ, req, me);
             } else {
-                llOwnerSay("repl: parse failed: "+data);
+                llSay(write_chan, "repl: parse failed: "+data);
+                state read;
             }
         } else if (num == MSG_EVAL_RESP) {
             if (succeeded(str)) {
@@ -133,16 +162,13 @@ state loop
                 send_native_req("repl", FN_PRSTR, args);
             } else {
                 llOwnerSay("repl: eval failed: "+data);
-                READ();
+                llSay(write_chan, "repl: eval failed: "+data);
+                state read;
             }
         } else if (num == MSG_NATIVE_RESP && tag == "repl") {
-            // in this case we're getting back a string form, but we want to
-            // print it, so we don't add quotes
-//            if (JSON_STRING == llJsonValueType(str,["data"]))
-//                data = "\""+data+"\"";
             llOwnerSay("repl: pr-str resp: "+str);
-            llOwnerSay("repl: "+data);
-            READ();
+            llSay(write_chan, data);
+            state read;
         }
     }
 }
