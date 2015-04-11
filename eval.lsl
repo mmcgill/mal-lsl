@@ -296,7 +296,7 @@ integer do_eval_ast(string s) {
         if (success == JSON_TRUE) {
             if (JSON_STRING == llJsonValueType(msg,["data"]))
                 data = requote(data);
-            llOwnerSay("eval: eval_ast: after_symbol_lookup: data="+data);
+//            llOwnerSay("eval: eval_ast: after_symbol_lookup: data="+data);
             form = llJsonSetValue(form, path, data);
             pop();
             // if we just copied a closure, we need to up the refcount to the referenced environment
@@ -429,7 +429,7 @@ integer do_apply(string s) {
         if (JSON_STRING == llJsonValueType(msg,["data"]) && path==[]) {
             form = requote(form);
         }
-        llOwnerSay("eval: form: "+form);
+//        llOwnerSay("eval: form: "+form);
         pop();
         return GO;
     }
@@ -724,8 +724,8 @@ integer run() {
     while (!is_empty() && status == GO) {
         string step = peek();
         integer step_code = (integer)llJsonGetValue(step,["s"]);
-        llOwnerSay("step: "+step+" ("+(string)llGetFreeMemory()+")");
-        llOwnerSay("form: "+form);
+        //llOwnerSay("step: "+step+" ("+(string)llGetFreeMemory()+")");
+        //llOwnerSay("form: "+form);
         //dump_stack();
         if (step_code == EVAL) status = do_eval(step);
         else if (step_code == EVAL_AST) status = do_eval_ast(step);
@@ -761,7 +761,7 @@ integer continue() {
         llMessageLinked(LINK_THIS, MSG_EVAL_RESP, resp, me);
         return DONE;
     } else {
-        llOwnerSay("eval: waiting");
+        //llOwnerSay("eval: waiting");
         return WAIT;
     }
 }
