@@ -196,7 +196,7 @@ set(string env_id, string k, string v) {
         string id = llJsonGetValue(v,["env_id"]);
         if (id != env_id) {
             inc_refcount(id);
-            env_decrefs = llJsonSetValue(env_decrefs, [env_id, JSON_APPEND], id);
+            env_decrefs = llJsonSetValue(env_decrefs, [env_id, JSON_APPEND], "\""+id+"\"");
         }
     }
 }
