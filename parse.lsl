@@ -136,6 +136,8 @@ string read_atom() {
         return token;
     } else if (0 == llSubStringIndex(token,":")) {
         return llList2Json(JSON_ARRAY, [KEYWORD, token]);
+    } else if (token == "nil") {
+        return "null";
     } else {
         return llList2Json(JSON_ARRAY, [SYMBOL, token]);
     }

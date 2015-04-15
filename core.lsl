@@ -92,7 +92,7 @@ string _pr_str(list path) {
     } else if (JSON_NUMBER == type) {
         return llJsonGetValue(form,path);
     } else if (JSON_NULL == type) {
-        return "null";
+        return "nil";
     } else if (JSON_STRING == type) {
         return escape_str(requote(llJsonGetValue(form, path)));
     } else if (JSON_ARRAY == type) {
