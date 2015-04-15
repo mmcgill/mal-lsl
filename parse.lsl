@@ -45,7 +45,19 @@ string requote(string s) {
 
 tokenize(string line) {
 //    llOwnerSay("tokenize: " + line);
-    tokens = llParseString2List(line, [" ","\n","\t"], ["(",")","{","}","[","]","\"",";"]);
+    tokens = llParseString2List(line, [], [" ","\n","\t","(",")","{","}","["]);
+    llOwnerSay("tokens0: "+llDumpList2String(tokens,","));
+    integer i;
+    // llParseString2List only handles 8 separators at a time, so we need to do another pass on
+    // all the tokens
+    for (i=0; i<llGetListLength(tokens);i++) {
+        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";"]);
+//        llOwnerSay("token="+llList2String(tokens,i)+" toks="+llDumpList2String(toks,","));
+        if (llGetListLength(toks)>1) {
+            tokens=llListReplaceList(tokens,toks,i,i);
+            i += llGetListLength(toks)-1;
+        }
+    }
     // merge strings, drop comments
     integer pos = 0;
     integer in_string = 0;
@@ -94,6 +106,8 @@ tokenize(string line) {
                 in_string = 1;
                 tokens = llListReplaceList(tokens, [""], pos, pos);
                 pos = pos + 1;
+            } else if (" " == token || "\n" == token || "\t" == token) {
+                tokens = llListReplaceList(tokens, [], pos, pos);
             } else if (";" == token) {
                 pos = llGetListLength(tokens);
             } else {
