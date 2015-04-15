@@ -98,7 +98,10 @@ state read
         llOwnerSay("Rezzed, responding on "+(string)param);
         read_chan = param;
         write_chan = param;
-        llListen(param,"MAL HTTP Bridge",NULL_KEY,"ack");
+        if (param != 0)
+            llListen(param,"MAL HTTP Bridge",NULL_KEY,"ack");
+        else
+            state default;
         llSay(param,"ready");
     }
 
@@ -127,12 +130,26 @@ state eval
 {
     state_entry()
     {
+        if (listen_key != NULL_KEY) {
+            llListen(read_chan, "", listen_key, "");
+        }
         llMessageLinked(LINK_THIS, MSG_PARSE_REQ, input, me);
     }
     
     touch(integer num)
     {
         state read;
+    }
+    
+    listen(integer chan, string name, key id, string message)
+    {
+        if ("," == llGetSubString(message, 0, 0)) {
+            input = llGetSubString(message,1,-1);
+            if (input=="exit") {
+                llOwnerSay("Goodbye.");
+                llDie();
+            }
+        }
     }
     
     link_message(integer sender, integer num, string str, key id)
