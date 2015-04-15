@@ -142,40 +142,21 @@ string pr_str() {
     }
 }
 
-string add() {
+string math(integer op) {
     float result = llList2Float(args,0);
+    integer is_int = 1;
     integer i;
     for (i=1; i < llGetListLength(args); i++) {
-        result += llList2Float(args,1);
+        if (op == 0) result += llList2Float(args,i);
+        else if (op == 1) result -= llList2Float(args,i);
+        else if (op == 2) result *= llList2Float(args,i);
+        else if (op == 3) result /= llList2Float(args,i);
+        is_int = is_int && llGetListEntryType(args,i) == TYPE_INTEGER;
     }
-    return (string)result;
-}
-
-string subtract() {
-    float result = llList2Float(args,0);
-    integer i;
-    for (i=1; i < llGetListLength(args); i++) {
-        result -= llList2Float(args,1);
-    }
-    return (string)result;
-}
-
-string multiply() {
-    float result = llList2Float(args,0);
-    integer i;
-    for (i=1; i < llGetListLength(args); i++) {
-        result *= llList2Float(args,1);
-    }
-    return (string)result;
-}
-
-string divide() {
-    float result = llList2Float(args,0);
-    integer i;
-    for (i=1; i < llGetListLength(args); i++) {
-        result /= llList2Float(args,1);
-    }
-    return (string)result;
+    if (is_int)
+        return (string)((integer)result);
+    else
+        return (string)result;
 }
 
 string list_qmark() {
@@ -273,10 +254,7 @@ string prn() {
 
 string run(integer id) {
     if (FN_PRSTR == id) return pr_str();
-    if (FN_ADD == id)   return add();
-    if (FN_SUB == id)   return subtract();
-    if (FN_MUL == id)   return multiply();
-    if (FN_DIV == id)   return divide();
+    if (FN_ADD <= id && id <= FN_DIV)   return math(id-FN_ADD);
     if (FN_LIST_QMARK == id) return list_qmark();
     if (FN_EMPTY_QMARK == id) return empty_qmark();
     if (FN_COUNT == id) return count();
