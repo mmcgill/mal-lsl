@@ -5,6 +5,7 @@ integer LIST = 0;
 integer SYMBOL = 1;
 integer KEYWORD = 2;
 integer VECTOR = 3;
+integer HASHMAP = 5;
 // any tag > NATIVE represents a native fn
 integer NATIVE_FN = 100;
 integer FN_ADD = 101;
@@ -112,6 +113,17 @@ string _pr_str(list path) {
             return s;
         } else if (SYMBOL == t || KEYWORD == t) {
             return llJsonGetValue(form,path+1);
+        } else if (HASHMAP == t) {
+            integer i;
+            string s;
+            list forms = llJson2List(llJsonGetValue(form,path+1));
+//            llOwnerSay("pr_str: forms="+llDumpList2String(forms," "));
+            for (i=0; i<llGetListLength(forms); i+=2) {
+                if (i > 0) s = s + " ";
+                string k = llList2String(forms,i);
+                s = s + escape_str(requote(k)) +" " + _pr_str(path+[1,k]);
+            }
+            return "{"+s+"}";
         } else {
             pr_str_error = 1;
             pr_str_error_message = "<ERROR> unknown tag " + (string)t;

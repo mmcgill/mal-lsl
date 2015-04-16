@@ -22,6 +22,7 @@ integer SYMBOL = 1;
 integer KEYWORD = 2;
 integer VECTOR = 3;
 integer BUILTIN = 4;
+integer HASHMAP = 5;
 
 string requote(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
@@ -46,12 +47,12 @@ string requote(string s) {
 tokenize(string line) {
 //    llOwnerSay("tokenize: " + line);
     tokens = llParseString2List(line, [], [" ","\n","\t","(",")","{","}","["]);
-    llOwnerSay("tokens0: "+llDumpList2String(tokens,","));
+//    llOwnerSay("tokens0: "+llDumpList2String(tokens,","));
     integer i;
     // llParseString2List only handles 8 separators at a time, so we need to do another pass on
     // all the tokens
     for (i=0; i<llGetListLength(tokens);i++) {
-        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";"]);
+        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";","\\"]);
 //        llOwnerSay("token="+llList2String(tokens,i)+" toks="+llDumpList2String(toks,","));
         if (llGetListLength(toks)>1) {
             tokens=llListReplaceList(tokens,toks,i,i);
@@ -66,20 +67,6 @@ tokenize(string line) {
     do {
 //        llOwnerSay("tokens: " + llDumpList2String(tokens,","));
         token = llList2String(tokens, pos);
-        // stupid llParseString2List doesn't handle backslash spacers
-        integer backslash_pos = llSubStringIndex(token, "\\");
-        if ("\\" != token && backslash_pos >= 0) {
-//            llOwnerSay("found backslash");
-            if (backslash_pos == llStringLength(token)-1) {
-                tokens = llListReplaceList(tokens, [llGetSubString(token,0,backslash_pos-1),"\\"],pos,pos);
-            } else {
-                tokens = llListReplaceList(tokens, [llGetSubString(token,0,backslash_pos-1),
-                                                    "\\",
-                                                    llGetSubString(token,backslash_pos+1,llStringLength(token))],
-                                           pos,pos);
-            }
-            token = llList2String(tokens, pos);
-        }
 //        llOwnerSay("token: " + token);
         if (in_string == 1) {
             if (escaped == 1) {
@@ -94,8 +81,7 @@ tokenize(string line) {
                 } else  if ("\\" == token) {
 //                    llOwnerSay("escaped=1");
                     escaped = 1;
-                    //tokens = llListReplaceList(tokens, [], pos, pos);
-                    tokens = llListReplaceList(tokens, [llList2String(tokens,pos-1)+token], pos-1,pos);
+                    tokens = llListReplaceList(tokens, [], pos,pos);
                 } else {
                     tokens = llListReplaceList(tokens, [llList2String(tokens,pos-1)+token], pos-1,pos);
                 }
@@ -117,7 +103,7 @@ tokenize(string line) {
     } while (pos < llGetListLength(tokens));
     num_tokens = llGetListLength(tokens);
     next_token = 0;
-//    llOwnerSay("tokens: " + llDumpList2String(tokens,","));
+//    llOwnerSay("final tokens: " + llDumpList2String(tokens,","));
 }
 
 string consume_token() {
@@ -145,8 +131,9 @@ string read_atom() {
     string token = consume_token();
 //    llOwnerSay("read_atom: "+token);
     string type = llJsonValueType(token,[]);
-    if ((JSON_NUMBER == type && "-" != token) || JSON_STRING == type || JSON_TRUE == type || JSON_FALSE == type ||
-        JSON_NULL == type) {
+    if (JSON_STRING == type) {
+        return token;
+    } else if ((JSON_NUMBER == type && "-" != token) || JSON_TRUE == type || JSON_FALSE == type || JSON_NULL == type) {
         return token;
     } else if (0 == llSubStringIndex(token,":")) {
         return llList2Json(JSON_ARRAY, [KEYWORD, token]);
@@ -189,11 +176,37 @@ string read_sequence() {
     return set_parse_error("Missing " + stop_token);
 }
 
+string read_hashmap() {
+    string hm  = llList2Json(JSON_ARRAY,[HASHMAP,"{}"]);
+    consume_token();
+    do {
+        string token = peek_token();
+        if ("}" == token) {
+            consume_token();
+            return hm;
+        } else {
+            string k = read_form();
+//            llOwnerSay("k="+k);
+            if (JSON_STRING != llJsonValueType(k,[])) {
+                return set_parse_error("Hashmap keys must be strings");
+            }
+            if ("" == llJsonGetValue(k,[])) {
+                return set_parse_error("Empty string cannot be a hashmap key");
+            }
+            string v = read_form();
+            hm = llJsonSetValue(hm, [1,llJsonGetValue(k,[])], v);
+        }
+    } while (next_token < num_tokens);
+    return set_parse_error("Missing }");
+}
+
 string read_form() {
     string token = peek_token();
 //    llOwnerSay("read_form: "+token);
     if ("(" == token || "[" == token) {
         return read_sequence();
+    } else if ("{" == token) {
+        return read_hashmap();
     } else {
         return read_atom();
     }
@@ -207,6 +220,7 @@ string read_str(string line)
 {
     reset_parse_error();
     tokenize(line);
+    llOwnerSay("tokens="+llDumpList2String(tokens," "));
     return read_form();
 }
 
