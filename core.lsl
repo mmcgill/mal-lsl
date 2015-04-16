@@ -23,6 +23,9 @@ integer FN_GREATER_THAN = 112;
 integer FN_GREATER_THAN_EQ = 113;
 integer FN_PRN = 114;
 
+// for keywords as map keys
+string KEYWORD_PREFIX = "ʞ";
+
 string escape_str(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
     integer i;
@@ -121,7 +124,13 @@ string _pr_str(list path) {
             for (i=0; i<llGetListLength(forms); i+=2) {
                 if (i > 0) s = s + " ";
                 string k = llList2String(forms,i);
-                s = s + escape_str(requote(k)) +" " + _pr_str(path+[1,k]);
+                string kstr;
+                if (KEYWORD_PREFIX == llGetSubString(k,0,0)) {
+                    kstr = llGetSubString(k,1,-1);
+                } else {
+                    kstr = escape_str(requote(k));
+                }
+                s = s + kstr +" " + _pr_str(path+[1,k]);
             }
             return "{"+s+"}";
         } else {

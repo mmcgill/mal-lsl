@@ -24,6 +24,9 @@ integer VECTOR = 3;
 integer BUILTIN = 4;
 integer HASHMAP = 5;
 
+// for keywords as map keys
+string KEYWORD_PREFIX = "ʞ";
+
 string requote(string s) {
     list parts = llParseString2List(s,[],["\\","\""]);
     integer i;
@@ -197,14 +200,19 @@ string read_hashmap() {
         } else {
             string k = read_form();
 //            llOwnerSay("k="+k);
-            if (JSON_STRING != llJsonValueType(k,[])) {
-                return set_parse_error("Hashmap keys must be strings");
-            }
-            if ("" == llJsonGetValue(k,[])) {
-                return set_parse_error("Empty string cannot be a hashmap key");
+            if (JSON_STRING == llJsonValueType(k,[])) {
+                if ("" == llJsonGetValue(k,[])) {
+                    return set_parse_error("Empty string cannot be a hashmap key");
+                }
+                k = llJsonGetValue(k,[]);
+            } else if (JSON_ARRAY == llJsonValueType(k,[]) && KEYWORD == (integer)llJsonGetValue(k,[0])) {
+                k = KEYWORD_PREFIX + llJsonGetValue(k,[1]);
+            } else {
+                return set_parse_error("Hashmap keys must be strings or keywords");
             }
             string v = read_form();
-            hm = llJsonSetValue(hm, [1,llJsonGetValue(k,[])], v);
+//            llOwnerSay("parse: key in map: "+k);
+            hm = llJsonSetValue(hm, [1,k], v);
         }
     } while (next_token < num_tokens);
     return set_parse_error("Missing }");
