@@ -49,10 +49,18 @@ tokenize(string line) {
     tokens = llParseString2List(line, [], [" ","\n","\t","(",")","{","}","["]);
 //    llOwnerSay("tokens0: "+llDumpList2String(tokens,","));
     integer i;
-    // llParseString2List only handles 8 separators at a time, so we need to do another pass on
+    // llParseString2List only handles 8 separators at a time, so we need to do another 2 passes on
     // all the tokens
     for (i=0; i<llGetListLength(tokens);i++) {
-        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";","\\",","]);
+        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";","\\",",","`","~","'"]);
+//        llOwnerSay("token="+llList2String(tokens,i)+" toks="+llDumpList2String(toks,","));
+        if (llGetListLength(toks)>1) {
+            tokens=llListReplaceList(tokens,toks,i,i);
+            i += llGetListLength(toks)-1;
+        }
+    }
+    for (i=0; i<llGetListLength(tokens);i++) {
+        list toks = llParseString2List(llList2String(tokens,i), [], ["@","^"]);
 //        llOwnerSay("token="+llList2String(tokens,i)+" toks="+llDumpList2String(toks,","));
         if (llGetListLength(toks)>1) {
             tokens=llListReplaceList(tokens,toks,i,i);
@@ -96,6 +104,8 @@ tokenize(string line) {
                 tokens = llListReplaceList(tokens, [], pos, pos);
             } else if (";" == token) {
                 pos = llGetListLength(tokens);
+            } else if ("~" == token && "@" == llList2String(tokens,pos+1)) {
+                tokens = llListReplaceList(tokens,["~@"], pos,pos+1);
             } else {
                 pos = pos + 1;
             }
@@ -207,6 +217,21 @@ string read_form() {
         return read_sequence();
     } else if ("{" == token) {
         return read_hashmap();
+    } else if ("'" == token || "`" == token || "~" == token || "@" == token || "~@" == token) {
+        consume_token();
+        string sym;
+        if ("'" == token)       sym = "quote";
+        else if ("`" == token)  sym = "quasiquote";
+        else if ("~" == token)  sym = "unquote";
+        else if ("~@" == token) sym = "splice-unquote";
+        else if ("@" == token)  sym = "deref";
+        return llJsonSetValue("["+(string)LIST+",["+(string)SYMBOL+",\"" + sym + "\"]]",[JSON_APPEND], read_form());
+    } else if ("^" == token) {
+        consume_token();
+        string md = read_form();
+        string r = "["+(string)LIST+",["+(string)SYMBOL+",\"with-meta\"]]";
+        r = llJsonSetValue(r,[JSON_APPEND], read_form());
+        return llJsonSetValue(r,[JSON_APPEND],md);
     } else {
         return read_atom();
     }
