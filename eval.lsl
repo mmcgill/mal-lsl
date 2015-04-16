@@ -5,6 +5,7 @@ integer LIST = 0;
 integer SYMBOL = 1;
 integer KEYWORD = 2;
 integer VECTOR = 3;
+integer HASHMAP = 5;
 
 string GLOBAL_ENV = "GLOBAL";
 
@@ -280,7 +281,14 @@ integer do_eval_ast(string s) {
                 s = llJsonSetValue(s,["i"], "1");
                 update(s);
                 return GO;
+            } else if (HASHMAP == tag) {
+                s = llJsonSetValue(s,["n"], "mapvals");
+                s = llJsonSetValue(s,["i"], "0");
+                update(s);
+                return GO;
             }
+            set_eval_error("Unevaluatable form "+llJsonGetValue(form,path));
+            return DONE;
         }
         pop();
         return GO;
@@ -317,6 +325,19 @@ integer do_eval_ast(string s) {
         if (JSON_INVALID != llJsonValueType(form,path+i)) {
             update(llJsonSetValue(s, ["i"], (string)(i+1)));
             push(eval(path+i, env_id));
+        } else {
+            pop();
+        }
+        return GO;
+    }
+    if (n == "mapvals") {
+        integer i = (integer)llJsonGetValue(s, ["i"]);
+        list map = llJson2List(llJsonGetValue(form,path+[1]));
+        if (i < llGetListLength(map)) {
+            string k = llList2String(map,i);
+//            llOwnerSay("eval: apply_ast: k="+k);
+            update(llJsonSetValue(s, ["i"], (string)(i+2)));
+            push(eval(path+[1,k], env_id));
         } else {
             pop();
         }
