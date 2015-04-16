@@ -52,7 +52,7 @@ tokenize(string line) {
     // llParseString2List only handles 8 separators at a time, so we need to do another pass on
     // all the tokens
     for (i=0; i<llGetListLength(tokens);i++) {
-        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";","\\"]);
+        list toks = llParseString2List(llList2String(tokens,i), [], ["]","\"",";","\\",","]);
 //        llOwnerSay("token="+llList2String(tokens,i)+" toks="+llDumpList2String(toks,","));
         if (llGetListLength(toks)>1) {
             tokens=llListReplaceList(tokens,toks,i,i);
@@ -92,7 +92,7 @@ tokenize(string line) {
                 in_string = 1;
                 tokens = llListReplaceList(tokens, [""], pos, pos);
                 pos = pos + 1;
-            } else if (" " == token || "\n" == token || "\t" == token) {
+            } else if (" " == token || "\n" == token || "\t" == token || "," == token) {
                 tokens = llListReplaceList(tokens, [], pos, pos);
             } else if (";" == token) {
                 pos = llGetListLength(tokens);
