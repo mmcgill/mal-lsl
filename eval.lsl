@@ -600,7 +600,8 @@ integer do_let(string s) {
             set_eval_error("def! requires two args");
             return DONE;
         }
-        if (JSON_ARRAY != llJsonValueType(bindings, []) || LIST != (integer)llJsonGetValue(bindings, [0])) {
+        if (JSON_ARRAY != llJsonValueType(bindings, []) || (LIST != (integer)llJsonGetValue(bindings, [0]) &&
+                                                            VECTOR != (integer)llJsonGetValue(bindings, [0]))) {
             set_eval_error("let* binding argument must be a list");
             return DONE;
         }
