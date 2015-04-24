@@ -368,18 +368,6 @@ list validate_args(list binds,list path) {
     return args;
 }
 
-string JsonType2String(string type) {
-    if (JSON_INVALID == type) return "INVALID";
-    else if (JSON_NUMBER == type) return "NUMBER";
-    else if (JSON_STRING == type) return "STRING";
-    else if (JSON_ARRAY == type) return "ARRAY";
-    else if (JSON_OBJECT == type) return "OBJECT";
-    else if (JSON_NULL == type) return "NULL";
-    else if (JSON_TRUE == type) return "TRUE";
-    else if (JSON_FALSE == type) return "FALSE";
-    else return "UNKNOWN";
-}
-
 integer do_apply(string s) {
     string n = llJsonGetValue(s,["n"]);
     list path = llJson2List(llJsonGetValue(s,["path"]));
