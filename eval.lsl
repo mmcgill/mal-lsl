@@ -622,9 +622,23 @@ integer do_let(string s) {
         if (JSON_STRING == llJsonValueType(form,path+[2,i+1]))
             result = requote(result);
 //        llOwnerSay("eval: let: arg evaluated ("+sym+"="+result+")");
+        
+        string sym = llJsonGetValue(form,path+[2,i,1]);
+        s=llJsonSetValue(s,["n"],"after_set");
+        s=llJsonSetValue(s,["i"],(string)(i+2));
         if (JSON_OBJECT == llJsonValueType(result,[]) && JSON_INVALID == llJsonValueType(result,["id"])) {
-            // we've 'consumed' a closure, so we need to decref
-            send_env_decref_req("after_decref", llJsonGetValue(result,["env_id"]));
+            // we've 'consumed' a closure, so we need to decref after we set
+            s=llJsonSetValue(s,["decref"],llJsonGetValue(result,["env_id"]));
+        }
+        update(s);
+        send_env_set_req("after_set", new_env_id, sym, result);
+        return WAIT;
+    }
+    if (n == "after_set") {
+//        llOwnerSay("eval: let: arg set");
+        string decref = llJsonGetValue(s,["decref"]);
+        if (JSON_INVALID != decref) {
+            send_env_decref_req("after_decref", decref);
             update(llJsonSetValue(s,["n"],"after_decref"));
             return WAIT;
         } else {
@@ -632,16 +646,6 @@ integer do_let(string s) {
         }
     }
     if (n == "after_decref") {
-        string sym = llJsonGetValue(form,path+[2,i,1]);
-        string result =  llJsonGetValue(form,path+[2,i+1]);
-        s=llJsonSetValue(s,["n"],"after_set");
-        s=llJsonSetValue(s,["i"],(string)(i+2));
-        update(s);
-        send_env_set_req("after_set", new_env_id, sym, result);
-        return WAIT;
-    }
-    if (n == "after_set") {
-//        llOwnerSay("eval: let: arg set");
         if (JSON_INVALID == llJsonValueType(form,path+[2,i])) {
             update(llJsonSetValue(s,["n"],"delete_env"));
             string expr = llJsonGetValue(form,path+3);
@@ -746,8 +750,8 @@ integer run() {
     while (!is_empty() && status == GO) {
         string step = peek();
         integer step_code = (integer)llJsonGetValue(step,["s"]);
-        //llOwnerSay("step: "+step+" ("+(string)llGetFreeMemory()+")");
-        //llOwnerSay("form: "+form);
+//        llOwnerSay("step: "+step+" ("+(string)llGetFreeMemory()+")");
+//        llOwnerSay("form: "+form);
         //dump_stack();
         if (step_code == EVAL) status = do_eval(step);
         else if (step_code == EVAL_AST) status = do_eval_ast(step);
