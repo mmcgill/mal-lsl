@@ -114,7 +114,7 @@ string create(string outer_id, string binds, string args) {
     }
     env_refcounts = llJsonSetValue(env_refcounts, [env_id], "1");
     env_decrefs = llJsonSetValue(env_decrefs, [env_id], "[]");
-//    llOwnerSay("env: create: env_id="+env_id+"binds="+binds+" args="+args+" env_decrefs="+env_decrefs);
+//    llOwnerSay("env: create: env_id="+env_id+" outer_id="+outer_id+" binds="+binds+" args="+args+" env_decrefs="+env_decrefs);
     integer i = 0;
     while (JSON_INVALID != llJsonValueType(args,[i])) {
         string k = llJsonGetValue(binds,[i,1]);
@@ -170,7 +170,8 @@ string find(string env_id, string k) {
 }
 
 string get(string env_id, string k) {
-//    llOwnerSay("env_get: "+env_map);
+//    llOwnerSay("env_get: env_id="+env_id+" k="+k);
+//    llOwnerSay("env_get: env_map="+env_map);
     env_id = find(env_id, k);
     if ("" == env_id) {
         return JSON_INVALID;

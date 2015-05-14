@@ -90,11 +90,20 @@ integer MSG_EVAL_REQ = 2;
 
 // MSG_EVAL_RESP: {"tag:"<string>,"success?":<boolean>,"data":<string or form>}
 integer MSG_EVAL_RESP = 3;
+send_eval_resp(string tag, string success) {
+    string resp = json_obj(["tag", tag, "success?", success]);
+    if (success == JSON_TRUE) {
+        resp = llJsonSetValue(resp,["data"],form);
+    } else {
+        resp = llJsonSetValue(resp,["data"],eval_error_message);
+    }
+    llMessageLinked(LINK_THIS, MSG_EVAL_RESP, resp, me);
+}
 
 // MSG_LOOKUP_REQ: {"tag": <string>, "env_id": <string>, "symbol":<string>}
 integer MSG_LOOKUP_REQ = 4;
 send_lookup(string env_id, string symbol, string tag) {
-    string req = llList2Json(JSON_OBJECT, ["env_id", env_id, "symbol", symbol, "tag", tag]);
+    string req = llList2Json(JSON_OBJECT, ["env_id", env_id, "symbol", symbol, "tag", "eval*_"+tag]);
     llMessageLinked(LINK_THIS, MSG_LOOKUP_REQ, req, me);
 }
 
@@ -105,7 +114,7 @@ integer MSG_LOOKUP_RESP = 5;
 integer MSG_NATIVE_REQ = 6;
 
 send_native_req(string tag, integer id, list args) {
-    string r = json_obj(["tag", tag, "native_id", id, "args", json_array(args)]);
+    string r = json_obj(["tag", "eval*_"+tag, "native_id", id, "args", json_array(args)]);
     llMessageLinked(LINK_THIS, MSG_NATIVE_REQ, r, me);
 }
 
@@ -116,29 +125,17 @@ integer MSG_NATIVE_RESP = 7;
 // MSG_ENV_CREATE_REQ: {"tag": <string>, "outer_id": <string>, "binds": <list of names>, "args", <list of values>}
 integer MSG_ENV_CREATE_REQ = 8;
 send_env_create_req(string tag, string outer_id, list binds, list args) {
-    string r = json_obj(["tag", tag, "outer_id", outer_id,"binds", json_array(binds), "args", json_array(args)]);
+    string r = json_obj(["tag", "eval*_"+tag, "outer_id", outer_id,"binds", json_array(binds), "args", json_array(args)]);
     llMessageLinked(LINK_THIS, MSG_ENV_CREATE_REQ, r, me);
 }
 
 // MSG_ENV_CREATE_RESP: {"tag": <string>, "data": <string>}
 integer MSG_ENV_CREATE_RESP = 9;
 
-/*
-// MSG_ENV_DELETE_REQ: {"tag": <string>, "env_id": <string>}
-integer MSG_ENV_DELETE_REQ = 10;
-send_env_delete_req(string tag, string env_id) {
-    string r = json_obj(["tag", tag, "env_id", env_id]);
-    llMessageLinked(LINK_THIS, MSG_ENV_DELETE_REQ, r, me);
-}
-
-// MSG_ENV_DELETE_RESP: {"tag": <string>}
-integer MSG_ENV_DELETE_RESP = 11;
-*/
-
 // MSG_ENV_SET_REQ: {"tag": <string>, "env_id": <string>, "symbol": <string>, "data": <form>}
 integer MSG_ENV_SET_REQ = 12;
 send_env_set_req(string tag, string env_id, string symbol, string form) {
-    string r = json_obj(["tag", tag, "env_id", env_id, "symbol", symbol]);
+    string r = json_obj(["tag", "eval*_"+tag, "env_id", env_id, "symbol", symbol]);
     r=llJsonSetValue(r,["data"],form);
     llMessageLinked(LINK_THIS, MSG_ENV_SET_REQ, r, me);
 }
@@ -149,7 +146,7 @@ integer MSG_ENV_SET_RESP = 13;
 // MSG_ENV_INCREF_REQ: {"tag": <string>, "env_id": <string>}
 integer MSG_ENV_INCREF_REQ = 14;
 send_env_incref_req(string tag, string env_id) {
-    string r = json_obj(["tag", tag, "env_id", env_id]);
+    string r = json_obj(["tag", "eval*_"+tag, "env_id", env_id]);
     llMessageLinked(LINK_THIS, MSG_ENV_INCREF_REQ, r, me);
 }
 
@@ -159,12 +156,19 @@ integer MSG_ENV_INCREF_RESP = 15;
 // MSG_ENV_DECREF_REQ: {"tag": <string>, "env_id": <string>}
 integer MSG_ENV_DECREF_REQ = 16;
 send_env_decref_req(string tag, string env_id) {
-    string r = json_obj(["tag", tag, "env_id", env_id]);
+    string r = json_obj(["tag", "eval*_"+tag, "env_id", env_id]);
     llMessageLinked(LINK_THIS, MSG_ENV_DECREF_REQ, r, me);
 }
 
 // MSG_ENV_DECREF_RESP: {"tag": <string>}
 integer MSG_ENV_DECREF_RESP = 17;
+
+// MSG_EVAL_LET_REQ: {"tag:":<string>,"data":<form>, "path": <list of strings>, "env_id": <string>}
+integer MSG_EVAL_LET_REQ = 18;
+send_eval_let_req(string tag, list path, string env_id) {
+    string r = json_obj(["tag", "eval*_"+tag, "env_id", env_id, "path", json_array(path), "form", form]);
+    llMessageLinked(LINK_THIS, MSG_EVAL_LET_REQ, r, me);
+}
 
 ///////////// STEPS ////////////////
 
@@ -204,29 +208,31 @@ integer do_eval(string s) {
     if (n == "start") {
         string type = llJsonValueType(form,path);
         if (JSON_ARRAY == type) {
-            integer tag = (integer)llJsonGetValue(form,path+0);
-            if (LIST == tag) {
+            integer _tag = (integer)llJsonGetValue(form,path+0);
+            if (LIST == _tag) {
                 if (JSON_ARRAY == llJsonValueType(form, path+1) &&
                     SYMBOL == (integer)llJsonGetValue(form, path+[1, 0])) {
                     string symbol = llJsonGetValue(form, path+[1, 1]);
                     if ("def!" == symbol) {
-                        pop();
+                        update(llJsonSetValue(s,["n"],"eval_end"));
                         push(def(path, env_id));
                         return GO;
                     } else if ("do" == symbol) {
-                        pop();
+                        update(llJsonSetValue(s,["n"],"eval_end"));
                         push(_do(path,env_id));
                         return GO;
                     } else if ("let*" == symbol) {
-                        pop();
-                        push(let(path, env_id));
-                        return GO;
+                        s = llJsonSetValue(s,["tag"],tag);
+                        update(llJsonSetValue(s,["n"],"after_special"));
+                        //push(let(path, env_id));
+                        send_eval_let_req("eval_after_let",path,env_id);
+                        return WAIT;
                     } else if ("fn*" == symbol) {
-                        pop();
+                        update(llJsonSetValue(s,["n"],"eval_end"));
                         push(fn(path, env_id));
                         return GO;
                     } else if ("if" == symbol) {
-                        pop();
+                        update(llJsonSetValue(s,["n"],"eval_end"));
                         push(_if(path, env_id));
                         return GO;
                     }
@@ -239,13 +245,31 @@ integer do_eval(string s) {
         return GO;
     }
     if (n == "after_ast") {
-        pop();
+        update(llJsonSetValue(s,["n"],"eval_end"));
         string type = llJsonValueType(form,path);
         if (JSON_ARRAY == type) {
             integer tag = (integer)llJsonGetValue(form,path+0);
             if (LIST == tag) {
-                push(apply(path));                
+                push(apply(path));
             }
+        }
+        return GO;
+    }
+    if (n == "after_special") {
+        tag = llJsonGetValue(s,["tag"]);
+        if (JSON_FALSE == llJsonGetValue(msg,["success?"])) {
+            set_eval_error(llJsonGetValue(msg,["data"]));
+            return DONE;
+        }
+        form = llJsonGetValue(msg,["data"]);
+        if (JSON_STRING == llJsonValueType(msg,["data"]))
+            form = requote(form);
+        n = "eval_end";
+    }
+    if (n == "eval_end") {
+        pop();
+        if (JSON_TRUE == llJsonGetValue(s,["respond"])) {
+            return DONE;
         }
         return GO;
     }
@@ -567,97 +591,6 @@ integer do_do(string s) {
     return DONE;    
 }
 
-integer LET = 5;
-string let(list path, string env_id) {
-    return json_obj(["s", LET, 
-                     "n", "start",
-                     "path", json_array(path), 
-                     "env_id", env_id]);
-}
-
-integer do_let(string s) {
-    string n = llJsonGetValue(s,["n"]);
-    list path = llJson2List(llJsonGetValue(s,["path"]));
-    string env_id = llJsonGetValue(s,["env_id"]);
-    string new_env_id = llJsonGetValue(s,["new_env_id"]);
-    integer i = (integer)llJsonGetValue(s,["i"]);
-    if (n == "start") {
-        string bindings = llJsonGetValue(form, path+2);
-        
-        if (JSON_INVALID == bindings || JSON_INVALID == llJsonGetValue(form, path+3)) {
-            set_eval_error("def! requires two args");
-            return DONE;
-        }
-        if (JSON_ARRAY != llJsonValueType(bindings, []) || (LIST != (integer)llJsonGetValue(bindings, [0]) &&
-                                                            VECTOR != (integer)llJsonGetValue(bindings, [0]))) {
-            set_eval_error("let* binding argument must be a list");
-            return DONE;
-        }
-        update(llJsonSetValue(s,["n"],"after_create"));
-        send_env_create_req("after_create", env_id, [], []);
-        return WAIT;
-    }        
-    if (n == "after_create") {
-//        llOwnerSay("eval: let: environment created");
-        new_env_id = llJsonGetValue(msg, ["data"]);
-        s = llJsonSetValue(s, ["new_env_id"], new_env_id);
-        i = 1;
-        s = llJsonSetValue(s, ["i"], "1");
-        n = "after_set";  
-    }
-    if (n == "after_eval") {
-        string result =  llJsonGetValue(form,path+[2,i+1]);
-        if (JSON_STRING == llJsonValueType(form,path+[2,i+1]))
-            result = requote(result);
-//        llOwnerSay("eval: let: arg evaluated ("+sym+"="+result+")");
-        
-        string sym = llJsonGetValue(form,path+[2,i,1]);
-        s=llJsonSetValue(s,["n"],"after_set");
-        s=llJsonSetValue(s,["i"],(string)(i+2));
-        if (JSON_OBJECT == llJsonValueType(result,[]) && JSON_INVALID == llJsonValueType(result,["id"])) {
-            // we've 'consumed' a closure, so we need to decref after we set
-            s=llJsonSetValue(s,["decref"],llJsonGetValue(result,["env_id"]));
-        }
-        update(s);
-        send_env_set_req("after_set", new_env_id, sym, result);
-        return WAIT;
-    }
-    if (n == "after_set") {
-//        llOwnerSay("eval: let: arg set");
-        string decref = llJsonGetValue(s,["decref"]);
-        if (JSON_INVALID != decref) {
-            send_env_decref_req("after_decref", decref);
-            update(llJsonSetValue(s,["n"],"after_decref"));
-            return WAIT;
-        } else {
-            n="after_decref";
-        }
-    }
-    if (n == "after_decref") {
-        if (JSON_INVALID == llJsonValueType(form,path+[2,i])) {
-            update(llJsonSetValue(s,["n"],"delete_env"));
-            string expr = llJsonGetValue(form,path+3);
-            if (JSON_STRING == llJsonValueType(form,path+3))
-                expr = requote(expr);
-            form = llJsonSetValue(form,path,expr);
-            push(eval(path,new_env_id));
-        } else {
-            s = llJsonSetValue(s, ["n"], "after_eval");
-            update(s);
-            push(eval(path+[2,(i+1)],new_env_id));
-        }
-        return GO;
-    }
-    if (n == "delete_env") {
-//        llOwnerSay("eval: let: delete env");
-        pop();
-        send_env_decref_req("delete_env", new_env_id);
-        return WAIT;
-    }
-    set_eval_error("Unrecognized let* step: "+n);
-    return DONE;    
-}
-
 integer FN = 6;
 string fn(list path, string env_id) {
     return json_obj(["s", FN,
@@ -746,7 +679,7 @@ integer run() {
         else if (step_code == APPLY)    status = do_apply(step);
         else if (step_code == DEF)      status = do_def(step);
         else if (step_code == DO)       status = do_do(step);
-        else if (step_code == LET)      status = do_let(step);
+//        else if (step_code == LET)      status = do_let(step);
         else if (step_code == FN)       status = do_fn(step);
         else if (step_code == IF)       status = do_if(step);
         else {
@@ -767,12 +700,20 @@ integer continue() {
     if (DONE == run()) {
         string resp;
         if (eval_error) {
-            resp = json_obj(["tag", tag, "success?", JSON_FALSE, "data", eval_error_message]);
+//            llOwnerSay("eval: failed: "+eval_error_message);
+            send_eval_resp(tag, JSON_FALSE);
+            eval_error = FALSE;
+            eval_error_message = "";
+            integer done;
+            do {
+                string s = peek();
+//                llOwnerSay("eval: popping after error: "+s);
+                done = s == "" || llJsonGetValue(s,["respond"]) == JSON_TRUE;
+                pop();
+            } while (!done);
         } else {
-            resp = json_obj(["tag", tag, "success?", JSON_TRUE]);
-            resp = llJsonSetValue(resp,["data"],form);
+            send_eval_resp(tag, JSON_TRUE);
         }
-        llMessageLinked(LINK_THIS, MSG_EVAL_RESP, resp, me);
         return DONE;
     } else {
         //llOwnerSay("eval: waiting");
@@ -797,33 +738,27 @@ default
     link_message(integer sender, integer num, string str, key id)
     {
         if (me == id) return;
+//        llOwnerSay("eval: msg: "+str);
+        string _tag = llJsonGetValue(str,["tag"]);
         if (num == MSG_EVAL_REQ) {
             form = llJsonGetValue(str,["data"]);
             if (JSON_STRING == llJsonValueType(str,["data"]))
                 form = requote(form);
-            tag = llJsonGetValue(str,["tag"]);
-            state evaluating;
+            tag = _tag;
+            if (JSON_INVALID != llJsonValueType(str,["path"])) {
+                list path = llJson2List(llJsonGetValue(str,["path"]));
+                string env_id = llJsonGetValue(str,["env_id"]);
+                push(eval(path,env_id));
+            } else {
+                push(eval([],GLOBAL_ENV));
+            }
+            update(llJsonSetValue(peek(), ["respond"],JSON_TRUE));
+            continue();
+        } else if ("eval*_" == llGetSubString(_tag,0,5)&&!is_empty()) {
+            msg_type = num;
+            msg = str;
+            continue();
         }
     }
 }
 
-state evaluating
-{
-    state_entry()
-    {
-        llOwnerSay("eval: evaluating");
-        push(eval([],GLOBAL_ENV));
-        if (DONE == continue()) {
-            state default;
-        }
-    }
-    
-    link_message(integer sender, integer num, string str, key id) {
-        if (me == id) return;
-        msg_type = num;
-        msg = str;
-        if (DONE == continue()) {
-            state default;
-        }
-    }
-}
