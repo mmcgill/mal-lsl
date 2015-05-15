@@ -118,6 +118,9 @@ string create(string outer_id, string binds, string args) {
     integer i = 0;
     while (JSON_INVALID != llJsonValueType(args,[i])) {
         string k = llJsonGetValue(binds,[i,1]);
+        if (k == "&") {
+            k = llJsonGetValue(binds,[i+1,1]);
+        }
         string v = llJsonGetValue(args,[i]);
         if (JSON_STRING == llJsonValueType(args,[i]))
             v = requote(v);
@@ -257,7 +260,7 @@ default
         init_global_env();
         llOwnerSay("env: ready ("+(string)llGetFreeMemory());
     }
-    
+
     touch_start(integer num)
     {
         string s = "environments: ";

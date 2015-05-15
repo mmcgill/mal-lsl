@@ -164,10 +164,13 @@ string pr_str() {
 }
 
 string math(integer op) {
-    float result = llList2Float(args,0);
-    integer is_int = 1;
+//    llOwnerSay("core: math: args_str="+args_str);
+    args = llJson2List(llJsonGetValue(args_str,[0]));
+//    llOwnerSay("core: math: args=["+llDumpList2String(args,",")+"]");
+    float result = llList2Float(args,1);
+    integer is_int = TYPE_INTEGER == llGetListEntryType(args,1);
     integer i;
-    for (i=1; i < llGetListLength(args); i++) {
+    for (i=2; i < llGetListLength(args); i++) {
         if (op == 0) result += llList2Float(args,i);
         else if (op == 1) result -= llList2Float(args,i);
         else if (op == 2) result *= llList2Float(args,i);
@@ -261,11 +264,12 @@ string compare(integer code) {
 
 string prn() {
     string s = "";
-    integer i;
+    integer i=1;
     form = args_str;
-    for (i=0; i<llGetListLength(args); i++) {
-        if (i > 0) s += " ";
-        s += _pr_str([i]);
+    while (JSON_INVALID != llJsonValueType(form,[0, i])) {
+        if (i > 1) s += " ";
+        s += _pr_str([0, i]);
+        i += 1;
     }
     // use llJsonGetValue to 'unquote' one level
     s = llJsonGetValue("\""+s+"\"",[]);

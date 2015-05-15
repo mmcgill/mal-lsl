@@ -237,6 +237,7 @@ integer do_eval(string s) {
                         return GO;
                     }
                 }
+                s=llJsonSetValue(s,["apply"],JSON_TRUE);
             }
         }
         
@@ -247,11 +248,8 @@ integer do_eval(string s) {
     if (n == "after_ast") {
         update(llJsonSetValue(s,["n"],"eval_end"));
         string type = llJsonValueType(form,path);
-        if (JSON_ARRAY == type) {
-            integer tag = (integer)llJsonGetValue(form,path+0);
-            if (LIST == tag) {
-                push(apply(path));
-            }
+        if (JSON_TRUE == llJsonGetValue(s,["apply"])) {
+            push(apply(path));
         }
         return GO;
     }
@@ -309,6 +307,9 @@ integer do_eval_ast(string s) {
                 s = llJsonSetValue(s,["n"], "mapvals");
                 s = llJsonSetValue(s,["i"], "0");
                 update(s);
+                return GO;
+            } else if (KEYWORD == tag) {
+                pop();
                 return GO;
             }
             set_eval_error("Unevaluatable form "+llJsonGetValue(form,path));
@@ -384,11 +385,27 @@ list validate_args(list binds,list path) {
     list args = llDeleteSubList(llJson2List(llJsonGetValue(form,path)),0,1);
     integer num_args = llGetListLength(args);
     integer num_binds = llGetListLength(binds);
-//    llOwnerSay("apply:num_args="+(string)num_args+" num_binds="+(string)num_binds);
-    if (num_args != num_binds) {
-        set_eval_error("Wrong number of args ("+(string)num_args+")");
-        return [];
+//    llOwnerSay("eval: validate_args: num_args="+(string)num_args+" num_binds="+(string)num_binds);
+//    llOwnerSay("eval: validate_args: "+llJsonGetValue(form,path));
+    if ("[1,\"&\"]" == llList2String(binds,num_binds-2)) {
+//        llOwnerSay("eval: validate_args: varargs!");
+        if (num_args < num_binds - 2) {
+            set_eval_error("Not enough args (needed "+(string)(num_binds-2)+")");
+            return [];
+        }
+        if (num_args > num_binds - 2) {
+            string last_arg = llList2Json(JSON_ARRAY,[LIST]+llList2List(args,num_binds-2,num_args-1));
+            args = llListReplaceList(args,[last_arg],num_binds-2,num_args-1);
+        } else {
+            args = args + "[]";
+        }
+    } else {
+        if (num_args != num_binds) {
+            set_eval_error("Wrong number of args ("+(string)num_args+")");
+            return [];
+        }
     }
+//    llOwnerSay("eval: validate_args: args="+llDumpList2String(args,","));
     return args;
 }
 
