@@ -21,6 +21,7 @@ integer FN_LESS_THAN_EQ = 111;
 integer FN_GREATER_THAN = 112;
 integer FN_GREATER_THAN_EQ = 113;
 integer FN_PRN = 114;
+integer FN_LIST = 115;
 
 string GLOBAL_ENV = "GLOBAL";
 
@@ -250,6 +251,7 @@ init_global_env() {
     add_native_fn(FN_GREATER_THAN,">", ["x","y"]);
     add_native_fn(FN_GREATER_THAN_EQ,">=", ["x","y"]);
     add_native_fn(FN_PRN,"prn", ["&", "x"]);
+    add_native_fn(FN_LIST,"list", ["&", "x"]);
 }
 
 default

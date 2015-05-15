@@ -22,6 +22,7 @@ integer FN_LESS_THAN_EQ = 111;
 integer FN_GREATER_THAN = 112;
 integer FN_GREATER_THAN_EQ = 113;
 integer FN_PRN = 114;
+integer FN_LIST = 115;
 
 // for keywords as map keys
 string KEYWORD_PREFIX = "ʞ";
@@ -163,6 +164,10 @@ string pr_str() {
     }
 }
 
+string _list() {
+    return llJsonGetValue(args_str,[0]);
+}
+
 string math(integer op) {
 //    llOwnerSay("core: math: args_str="+args_str);
     args = llJson2List(llJsonGetValue(args_str,[0]));
@@ -286,6 +291,7 @@ string run(integer id) {
     if (FN_EQ == id) return equal([0],[1]);
     if (FN_LESS_THAN <= id && id <= FN_GREATER_THAN_EQ) return compare(id);
     if (FN_PRN == id) return prn();
+    if (FN_LIST == id) return _list();
     return error("Unrecognized native fn id: "+(string)id);
 }
 
