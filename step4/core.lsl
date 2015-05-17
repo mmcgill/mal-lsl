@@ -213,6 +213,8 @@ string count() {
     integer tag = (integer)llJsonGetValue(args_str, [0, 0]);
     if (JSON_ARRAY == llJsonValueType(args_str, [0]) && (LIST == tag || VECTOR == tag)) {
         return (string)(llGetListLength(llJson2List(llList2String(args,0)))-1);
+    } else if (JSON_NULL == llJsonValueType(args_str,[0])) {
+        return "0";
     } else {
         return error("Invalid type");
     }
@@ -233,8 +235,9 @@ string equal(list path_a, list path_b) {
             }
             integer i;
             for (i=1; i<len; i++) {
-                if (JSON_TRUE != equal(path_a+[i], path_b+[i]))
+                if (JSON_TRUE != equal(path_a+[i], path_b+[i])) {
                     return JSON_FALSE;
+                }
             }
             return JSON_TRUE;
         } else if (xtag != ytag) {

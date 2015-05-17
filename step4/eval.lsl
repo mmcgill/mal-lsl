@@ -181,7 +181,7 @@ string json_array(list l) {
 }
 
 integer decref_if_needed(list path) {
-    llOwnerSay("eval: decref_if_needed: path=["+llDumpList2String(path, ",")+"]");
+//    llOwnerSay("eval: decref_if_needed: path=["+llDumpList2String(path, ",")+"]");
     // If the result was a function, then it has a ref on its closed-over environment,
     // and that ref isn't going to be released by function application, so we release it
     // to avoid leaking the closed over environment.
@@ -397,7 +397,7 @@ list validate_args(list binds,list path) {
             string last_arg = llList2Json(JSON_ARRAY,[LIST]+llList2List(args,num_binds-2,num_args-1));
             args = llListReplaceList(args,[last_arg],num_binds-2,num_args-1);
         } else {
-            args = args + "[]";
+            args = args + "[0]";
         }
     } else {
         if (num_args != num_binds) {
