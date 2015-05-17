@@ -71,14 +71,20 @@ integer succeeded(string msg) {
 }
 
 string input;
+integer initializing = TRUE;
 
 default
 {
     state_entry()
     {
         if (me == NULL_KEY) me = llGenerateKey();
-        llOwnerSay("repl: ready ("+(string)llGetFreeMemory()+")");
-        state read;
+        if (initializing) {
+            input = "(def! not (fn* [x] (if x false true)))";
+            state eval;
+        } else {
+            llOwnerSay("repl: ready ("+(string)llGetFreeMemory()+")");
+            state read;
+        }
     }
 }
 
@@ -168,7 +174,7 @@ state eval
                 llSay(write_chan, "repl: parse failed: "+data);
                 state read;
             }
-        } else if (num == MSG_EVAL_RESP) {
+        } else if (num == MSG_EVAL_RESP && tag == "eval1") {
             if (succeeded(str)) {
                 if (JSON_STRING == llJsonValueType(str,["data"]))
                     data = requote(data);
@@ -184,7 +190,11 @@ state eval
             }
         } else if (num == MSG_NATIVE_RESP && tag == "repl") {
             llOwnerSay("repl: pr-str resp: "+str);
-            llSay(write_chan, data);
+            if (initializing) {
+                initializing = FALSE;
+            } else {
+                llSay(write_chan, data);
+            }
             state read;
         }
     }
